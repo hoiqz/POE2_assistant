@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { auth } from '../services/api'
 import { getErrorMessage } from '../services/errorHandler'
 
@@ -9,7 +8,6 @@ export default function Signup() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const navigate = useNavigate()
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()

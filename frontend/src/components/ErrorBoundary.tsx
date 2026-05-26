@@ -1,4 +1,5 @@
-import React, { ReactNode } from 'react'
+import React from 'react'
+import type { ReactNode } from 'react'
 
 interface Props {
   children: ReactNode
@@ -35,7 +36,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
               We encountered an unexpected error. Please try refreshing the page or
               contacting support if the problem persists.
             </p>
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <details className="text-xs text-gray-500 mb-4 bg-gray-100 p-2 rounded">
                 <summary className="cursor-pointer font-semibold">
                   Error details (development only)
