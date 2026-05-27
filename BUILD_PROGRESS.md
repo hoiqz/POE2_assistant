@@ -1211,9 +1211,25 @@ Duration: ~52 seconds
 ### What's Ready
 The POE2 Companion application is **production-ready** and fully operational:
 - Users can create accounts and authenticate
-- Users can import Path of Exile 2 builds from JSON
+- Users can import Path of Exile 2 builds from **JSON or Build Code** formats
 - Users can chat with Claude about their builds
 - Users can save and view build variants
 - All data is securely stored in PostgreSQL
 - Application is deployed globally and accessible
+
+### New Feature: Build Code Imports (2026-05-27)
+
+**Added Support for PoE Build Codes**
+- Toggle between JSON and Build Code import formats on import page
+- Build codes are base64-decoded and parsed to extract build information
+- Automatically extracts: class, main skill, ascendancy, and level
+- Both import methods store builds in unified format
+- ✅ Tested with 66/66 E2E tests passing
+
+**How It Works:**
+1. User selects "Build Code" format on import page
+2. Pastes their Path of Exile 2 build code (base64-encoded string)
+3. Backend decodes and parses the code
+4. Build is stored with same structure as JSON imports
+5. All features (chat, variants, export) work identically
 
