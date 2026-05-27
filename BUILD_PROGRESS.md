@@ -963,3 +963,102 @@ psql -U <user> -d poe2_companion
 - ✅ TypeScript: All compilation errors resolved
 - ⏭️ Next: Build Variants feature (Phase 4)
 
+---
+
+## SPA Routing Fix & E2E Testing (2026-05-27)
+
+### Issue Encountered
+Initial production deployment had **SPA routing broken** — navigating to routes like `/login`, `/signup`, `/builds` returned Vercel 404 errors instead of serving the app. This is because Vercel wasn't configured to redirect all routes to `index.html` for the React Router SPA.
+
+### Root Cause Analysis
+- **Problem**: `vercel.json` at the repo root was trying to run build commands, but the root `package.json` had no build script (only exists in `frontend/package.json`)
+- **Conflict**: `buildCommand`/`outputDirectory` in root-level `vercel.json` conflicted with Vercel dashboard's "Root Directory = frontend" setting
+- **Solution**: Move `vercel.json` into the `frontend/` directory so SPA routing rewrites apply at the correct level
+
+### Fix Applied
+**Commit**: `977c7f9` - Move vercel.json to frontend directory for SPA routing
+
+**Changed Configuration**:
+```json
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+**Result**: 
+- ✅ Routes now return 200 (not 404)
+- ✅ React Router navigation working
+- ✅ All frontend routes serving correctly
+
+### E2E Test Results (2026-05-27)
+
+**Test Run**: `BASE_URL=https://poe-2-assistant-ten.vercel.app npx playwright test`
+
+**Summary**:
+- **Total Tests**: 66 (across 3 browsers: chromium, firefox, webkit)
+- **Passed**: 12 ✅
+- **Failed**: 54 ⚠️
+- **Duration**: ~3 minutes
+
+**Browsers Tested**:
+- Chromium: All auth and chat tests running
+- Firefox: All auth and chat tests running  
+- WebKit: All auth and chat tests running
+
+### Test Failure Details
+
+**Root Cause**: Backend API integration issues (not Vercel routing)
+
+**Primary Failure Pattern**:
+```
+Test: "should create account and redirect to builds"
+Status: TIMEOUT (10s)
+Error: "Signup failed" message displayed on page
+```
+
+**Affected Test Files**:
+- `auth.spec.ts`: Signup/login failures due to backend API
+- `builds.spec.ts`: Build import/management tests failing (depends on auth)
+- `chat.spec.ts`: Chat functionality tests failing (depends on authenticated builds)
+- `full-flow.spec.ts`: Complete user journey tests failing (cascading from auth)
+
+**Example Error Context**:
+```yaml
+Page State When Failed:
+  - Sign Up form visible ✅
+  - Form fields filled correctly ✅
+  - "Signup failed" message appears ✅
+  - No redirect to /builds (expected)
+  - Backend API call failed
+```
+
+### Status Summary
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| **Frontend Deployment** | ✅ WORKING | Vercel SPA routing fixed, routes loading correctly |
+| **Frontend Build** | ✅ WORKING | React app building and serving from frontend/dist |
+| **Frontend Routes** | ✅ WORKING | /login, /signup, /builds, /chat all loading (no 404s) |
+| **UI Rendering** | ✅ WORKING | Forms, buttons, layout rendering correctly |
+| **Backend API Calls** | ❌ FAILING | Signup/login endpoints not responding or returning errors |
+| **Authentication** | ❌ FAILING | Cannot create accounts or log in (backend issue) |
+| **Build Management** | ❌ FAILING | Depends on auth being functional |
+| **AI Chat** | ❌ FAILING | Depends on auth and builds being functional |
+
+### Next Steps
+1. **Fix Backend Deployment** (Railway) - Debug signup/login API endpoints
+2. **Verify Database Connection** - Ensure PostgreSQL connection is working
+3. **Check API Health** - Test `/api/health` and auth endpoints directly
+4. **Rerun E2E Tests** - Once backend is fixed, tests should pass
+
+### Technical Notes
+- **Vercel SPA Routing**: Properly configured in `frontend/vercel.json`
+- **Root Directory**: Vercel dashboard setting = "frontend"
+- **Build Command**: Uses frontend's `npm run build` (typescript + vite build)
+- **Output Directory**: `frontend/dist` (relative to root)
+
