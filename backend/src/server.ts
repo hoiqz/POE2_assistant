@@ -9,11 +9,18 @@ app.use(cors())
 app.use(express.json())
 
 console.log('Database URL configured:', process.env.DATABASE_URL ? 'Yes (from env)' : 'No (using default)')
+if (process.env.DATABASE_URL) {
+  console.log('DATABASE_URL:', process.env.DATABASE_URL.substring(0, 50) + '...')
+}
 console.log('DB Host:', process.env.DB_HOST || 'localhost')
 
 pool.query('SELECT 1', (err) => {
   if (err) {
-    console.error('Database connection failed:', err.message)
+    console.error('Database connection failed!')
+    console.error('Error type:', err.constructor.name)
+    console.error('Error message:', err.message || '(no message)')
+    console.error('Error code:', err.code || '(no code)')
+    console.error('Full error:', JSON.stringify(err, null, 2))
   } else {
     console.log('Database connection successful')
   }
