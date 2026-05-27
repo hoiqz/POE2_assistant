@@ -14,7 +14,7 @@ if (process.env.DATABASE_URL) {
 }
 console.log('DB Host:', process.env.DB_HOST || 'localhost')
 
-pool.query('SELECT 1', (err) => {
+pool.query('SELECT 1', (err: any) => {
   if (err) {
     console.error('Database connection failed!')
     console.error('Error type:', err.constructor.name)
