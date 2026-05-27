@@ -15,9 +15,36 @@ interface ParsedBuild {
 function parsePoB(data: any): ParsedBuild {
   return {
     class: data.classId || data.class || 'Unknown',
-    ascendancy: data.ascendancyName,
-    mainSkill: data.mainSkill?.gem?.name,
+    ascendancy: data.ascendancyName || data.ascendancy,
+    mainSkill: data.mainSkill?.gem?.name || (typeof data.mainSkill === 'string' ? data.mainSkill : undefined),
     level: data.level,
+  }
+}
+
+function decodeBuildCode(code: string): any {
+  try {
+    // PoE build codes are typically base64-encoded
+    const decoded = Buffer.from(code.trim(), 'base64').toString('utf-8')
+
+    // Try to parse as JSON first
+    try {
+      return JSON.parse(decoded)
+    } catch {
+      // If not JSON, return as parsed build object with extracted data
+      // Extract common patterns from the decoded string
+      const classMatch = decoded.match(/class[":']?\s*[=:]\s*['""]?([^'"\n,}]+)/i)
+      const skillMatch = decoded.match(/skill[":']?\s*[=:]\s*['""]?([^'"\n,}]+)/i)
+      const ascendancyMatch = decoded.match(/ascendancy[":']?\s*[=:]\s*['""]?([^'"\n,}]+)/i)
+
+      return {
+        class: classMatch ? classMatch[1]!.trim() : 'Unknown',
+        mainSkill: skillMatch ? skillMatch[1]!.trim() : undefined,
+        ascendancy: ascendancyMatch ? ascendancyMatch[1]!.trim() : undefined,
+        rawCode: decoded,
+      }
+    }
+  } catch (error) {
+    throw new Error('Invalid build code format')
   }
 }
 
@@ -42,6 +69,40 @@ router.post('/import', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Import error:', error)
     res.status(400).json({ error: 'Import failed' })
+  }
+})
+
+router.post('/import-code', authenticate, async (req, res) => {
+  try {
+    const { name, buildCode } = req.body
+    const userId = (req as any).userId
+
+    if (!buildCode?.trim()) {
+      return res.status(400).json({ error: 'Build code required' })
+    }
+
+    // Decode the build code
+    const decodedBuild = decodeBuildCode(buildCode)
+    const parsed = parsePoB(decodedBuild)
+
+    // Store the decoded build data as JSON
+    const buildData = {
+      class: parsed.class || 'Unknown',
+      ascendancy: parsed.ascendancy,
+      mainSkill: parsed.mainSkill,
+      rawCode: decodedBuild.rawCode || buildCode,
+      importedFrom: 'buildCode',
+    }
+
+    const result = await pool.query(
+      'INSERT INTO builds (user_id, name, class, main_skill, build_data) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [userId, name || 'Imported Build', parsed.class || 'Unknown', parsed.mainSkill || null, JSON.stringify(buildData)]
+    )
+
+    res.json(result.rows[0])
+  } catch (error) {
+    console.error('Build code import error:', error)
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to import build code' })
   }
 })
 

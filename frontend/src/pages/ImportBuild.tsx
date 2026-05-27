@@ -5,7 +5,8 @@ import { getErrorMessage } from '../services/errorHandler'
 
 export default function ImportBuild() {
   const [name, setName] = useState('')
-  const [pobJson, setPobJson] = useState('')
+  const [buildData, setBuildData] = useState('')
+  const [importFormat, setImportFormat] = useState<'json' | 'code'>('json')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
@@ -16,23 +17,31 @@ export default function ImportBuild() {
     setLoading(true)
 
     try {
-      if (!pobJson.trim()) {
-        setError('Please paste build JSON')
+      if (!buildData.trim()) {
+        setError(`Please paste build ${importFormat === 'json' ? 'JSON' : 'code'}`)
         return
       }
 
-      let parsedJson
-      try {
-        parsedJson = JSON.parse(pobJson)
-      } catch (jsonErr) {
-        setError('Invalid JSON format. Please check your build data.')
-        return
-      }
+      if (importFormat === 'json') {
+        let parsedJson
+        try {
+          parsedJson = JSON.parse(buildData)
+        } catch (jsonErr) {
+          setError('Invalid JSON format. Please check your build data.')
+          return
+        }
 
-      await API.post('/builds/import', {
-        name: name || 'Imported Build',
-        pobJson: parsedJson,
-      })
+        await API.post('/builds/import', {
+          name: name || 'Imported Build',
+          pobJson: parsedJson,
+        })
+      } else {
+        // Build code format
+        await API.post('/builds/import-code', {
+          name: name || 'Imported Build',
+          buildCode: buildData.trim(),
+        })
+      }
 
       navigate('/builds')
     } catch (err: any) {
@@ -65,18 +74,48 @@ export default function ImportBuild() {
         </div>
 
         <div className="mb-4">
+          <label className="block mb-2 font-semibold text-sm sm:text-base">Import Format</label>
+          <div className="flex gap-4 mb-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="format"
+                value="json"
+                checked={importFormat === 'json'}
+                onChange={() => setImportFormat('json')}
+                className="cursor-pointer"
+              />
+              <span className="text-sm sm:text-base">JSON</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="format"
+                value="code"
+                checked={importFormat === 'code'}
+                onChange={() => setImportFormat('code')}
+                className="cursor-pointer"
+              />
+              <span className="text-sm sm:text-base">Build Code</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="mb-4">
           <label className="block mb-2 font-semibold text-sm sm:text-base">
-            Paste Build JSON
+            Paste Build {importFormat === 'json' ? 'JSON' : 'Code'}
           </label>
           <textarea
-            value={pobJson}
-            onChange={(e) => setPobJson(e.target.value)}
-            placeholder='{"class": "Witch", "mainSkill": {...}, ...}'
+            value={buildData}
+            onChange={(e) => setBuildData(e.target.value)}
+            placeholder={importFormat === 'json' ? '{"class": "Witch", "mainSkill": {...}, ...}' : 'Paste your build code here'}
             className="w-full border border-gray-300 p-2 sm:p-3 rounded font-mono text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows={10}
           />
           <p className="text-xs sm:text-sm text-gray-500 mt-2">
-            Paste the complete build JSON from PathOfBuilding export
+            {importFormat === 'json'
+              ? 'Paste the complete build JSON from PathOfBuilding export'
+              : 'Paste the build code from the in-game Path of Exile 2 build link'}
           </p>
         </div>
 

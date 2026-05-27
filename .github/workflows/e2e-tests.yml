@@ -1,0 +1,161 @@
+name: E2E Regression Tests
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'tests/**'
+      - '.github/workflows/e2e-tests.yml'
+      - 'playwright.config.ts'
+      - 'package.json'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'tests/**'
+      - 'playwright.config.ts'
+
+env:
+  NODE_VERSION: '18'
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+jobs:
+  e2e-tests:
+    name: Playwright E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      # 3. Install dependencies
+      - name: Install root dependencies
+        run: npm install
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm install
+
+      - name: Install backend dependencies
+        run: cd backend && npm install
+
+      # 4. Install Playwright browsers
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      # 5. Start backend server in background
+      - name: Start backend server
+        run: |
+          cd backend
+          npx tsx src/server.ts > /tmp/backend.log 2>&1 &
+          echo "Backend starting..."
+          sleep 3
+          # Check if backend is running
+          if ! curl -s http://localhost:3000/api/health; then
+            echo "Backend failed to start"
+            cat /tmp/backend.log
+            exit 1
+          fi
+
+      # 6. Run Playwright tests
+      - name: Run Playwright tests
+        run: npm run test:e2e -- --project chromium
+        env:
+          BASE_URL: http://localhost:5173
+
+      # 7. Upload test results
+      - name: Upload Playwright Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+      # 8. Upload test results for PR comments
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+
+      # 9. Comment on PR with test results
+      - name: Comment PR with test results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Check if test results exist
+            const reportPath = 'playwright-report/index.html';
+            if (fs.existsSync(reportPath)) {
+              const comment = `## ✅ E2E Regression Tests
+
+Tests have completed. View the full report in the artifacts tab.
+
+**Artifacts:**
+- 📊 Playwright HTML Report
+- 📸 Test Screenshots (failures only)`;
+
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            }
+
+  # Optional: Test against deployed URLs
+  # Uncomment this job to run tests against production
+  # e2e-tests-production:
+  #   name: E2E Tests (Production)
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 30
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: 'npm'
+  #
+  #     - name: Install dependencies
+  #       run: npm install
+  #
+  #     - name: Install Playwright browsers
+  #       run: npx playwright install --with-deps chromium
+  #
+  #     - name: Run tests against production
+  #       run: npm run test:e2e -- --project chromium
+  #       env:
+  #         BASE_URL: https://poe-2-assistant-ten.vercel.app
+  #
+  #     - name: Upload test results
+  #       if: always()
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: playwright-report-prod
+  #         path: playwright-report/
