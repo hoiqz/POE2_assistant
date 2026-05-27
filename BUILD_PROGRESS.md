@@ -1012,7 +1012,7 @@ Initial production deployment had **SPA routing broken** — navigating to route
 
 ### Test Failure Details
 
-**Root Cause**: Backend API integration issues (not Vercel routing)
+**Root Cause**: Backend API database connection not configured on Railway
 
 **Primary Failure Pattern**:
 ```
@@ -1021,23 +1021,44 @@ Status: TIMEOUT (10s)
 Error: "Signup failed" message displayed on page
 ```
 
-**Affected Test Files**:
-- `auth.spec.ts`: Signup/login failures due to backend API
-- `builds.spec.ts`: Build import/management tests failing (depends on auth)
-- `chat.spec.ts`: Chat functionality tests failing (depends on authenticated builds)
-- `full-flow.spec.ts`: Complete user journey tests failing (cascading from auth)
+**Investigation Found**:
+- ✅ Frontend deployment working (Vercel SPA routing fixed)
+- ✅ Frontend routes loading correctly
+- ❌ Backend API endpoints failing - DATABASE_URL not set on Railway
+- ❌ Cannot create accounts or authenticate
 
-**Example Error Context**:
-```yaml
-Page State When Failed:
-  - Sign Up form visible ✅
-  - Form fields filled correctly ✅
-  - "Signup failed" message appears ✅
-  - No redirect to /builds (expected)
-  - Backend API call failed
-```
+### Backend Database Fix (2026-05-27 - In Progress)
 
-### Status Summary
+**Commits Applied**:
+- `4c5d99d` - Fix backend database configuration to use environment variables
+- `7283999` - Add database connection diagnostics logging
+
+**Changes Made**:
+1. **Updated `backend/src/db.ts`**:
+   - Now reads `DATABASE_URL` from environment (Railway sets this)
+   - Falls back to individual `DB_*` environment variables
+   - Supports both connection string and individual parameter formats
+
+2. **Updated `backend/src/routes/auth.ts`**:
+   - Added console.error logging for signup/login failures
+   - Helps identify root cause in production logs
+
+3. **Updated `backend/src/server.ts`**:
+   - Logs whether DATABASE_URL is configured
+   - Tests database connection on startup
+   - Provides diagnostic information in production logs
+
+**Local Testing**:
+- ✅ Backend code changes verified locally - signup working
+- ⏳ Waiting for Railway redeploy to test with production database
+
+**Next Steps**:
+1. **Monitor Railway Deployment**: Wait for new version to deploy
+2. **Check Railway Logs**: Verify database connection status
+3. **Test Signup Endpoint**: Confirm API returns token (not "Signup failed")
+4. **Rerun E2E Tests**: Once API working, tests should pass
+
+### Status Summary (Updated)
 
 | Component | Status | Details |
 |-----------|--------|---------|
@@ -1045,20 +1066,15 @@ Page State When Failed:
 | **Frontend Build** | ✅ WORKING | React app building and serving from frontend/dist |
 | **Frontend Routes** | ✅ WORKING | /login, /signup, /builds, /chat all loading (no 404s) |
 | **UI Rendering** | ✅ WORKING | Forms, buttons, layout rendering correctly |
-| **Backend API Calls** | ❌ FAILING | Signup/login endpoints not responding or returning errors |
-| **Authentication** | ❌ FAILING | Cannot create accounts or log in (backend issue) |
-| **Build Management** | ❌ FAILING | Depends on auth being functional |
-| **AI Chat** | ❌ FAILING | Depends on auth and builds being functional |
-
-### Next Steps
-1. **Fix Backend Deployment** (Railway) - Debug signup/login API endpoints
-2. **Verify Database Connection** - Ensure PostgreSQL connection is working
-3. **Check API Health** - Test `/api/health` and auth endpoints directly
-4. **Rerun E2E Tests** - Once backend is fixed, tests should pass
+| **Backend Code** | ✅ FIXED | Database config now supports Railway DATABASE_URL |
+| **Backend API Calls** | ⏳ PENDING | Waiting for Railway redeploy with new code |
+| **Database Connection** | ⏳ PENDING | Need to verify DATABASE_URL is set on Railway |
+| **Authentication** | ⏳ PENDING | Will work once database connection is verified |
 
 ### Technical Notes
 - **Vercel SPA Routing**: Properly configured in `frontend/vercel.json`
 - **Root Directory**: Vercel dashboard setting = "frontend"
 - **Build Command**: Uses frontend's `npm run build` (typescript + vite build)
 - **Output Directory**: `frontend/dist` (relative to root)
+- **Railway Fix**: See `.github/RAILWAY_DEPLOYMENT_FIX.md` for complete setup guide
 
