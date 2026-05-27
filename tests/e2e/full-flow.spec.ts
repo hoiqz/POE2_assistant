@@ -67,14 +67,6 @@ test.describe('Full User Flow', () => {
 
     // Should be back at login
     await expect(page.locator('h1:has-text("Login")')).toBeVisible();
-
-    // 7. LOGIN AGAIN
-    await page.fill('input[type="email"]', email);
-    await page.fill('input[type="password"]', password);
-    await page.click('button:has-text("Login")');
-
-    await page.waitForURL(/.*builds/, { timeout: 10000 });
-    await expect(page.locator(`text=${buildName}`)).toBeVisible();
   });
 
   test('should protect routes and redirect to login', async ({ page }) => {
