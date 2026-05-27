@@ -965,6 +965,83 @@ psql -U <user> -d poe2_companion
 
 ---
 
+## Production Deployment Fixed (2026-05-27 - RESOLVED)
+
+### Problem: Backend API Failing on Railway
+
+**Initial Symptom**: E2E tests failing (54/66 failures) with "Signup failed" errors
+- Frontend deployment working ✅
+- Backend API returning generic errors ❌
+
+**Root Cause Analysis**: 
+- DATABASE_URL environment variable not being injected by Railway
+- `${{Postgres.DATABASE_URL}}` syntax was not working
+- Backend falling back to localhost (doesn't exist on Railway)
+
+### Solution Applied
+
+**Issue 1: Wrong Variable Reference Syntax**
+- Initial attempt used: `${{Postgres.DATABASE_URL}}`
+- This was not being resolved by Railway
+- Solution: Manually set DATABASE_URL to actual connection string
+
+**Issue 2: Improved Error Logging**
+- Added detailed error logging to diagnose the issue
+- Backend now shows:
+  - Whether DATABASE_URL is configured
+  - Actual connection string prefix (for verification)
+  - Full error details if connection fails
+
+**Steps to Fix (What Worked)**:
+
+1. ✅ Created PostgreSQL service on Railway
+2. ✅ Created database tables using SQL
+3. ❌ Tried `${{Postgres.DATABASE_URL}}` - didn't work
+4. ✅ Manually set DATABASE_URL to full connection string from Railway
+
+**Final Configuration**:
+- Backend Variables → DATABASE_URL = `postgresql://postgres:PASSWORD@switchback.proxy.rlwy.net:53030/railway`
+- This worked immediately after redeploy
+
+### Verification Status
+
+**Step 1: Database Connection** ✅
+```
+[DB] Using DATABASE_URL from environment
+Database URL configured: Yes (from env)
+DATABASE_URL: postgresql://postgres:hzEBQqJIBdYZXsQFpTf...
+Server running on port 3000
+Database connection successful
+```
+
+**Step 2: Signup API Test** ✅
+```bash
+curl -X POST https://poe2assistant-production.up.railway.app/api/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"testuser123@example.com","password":"testpass123"}'
+```
+✅ Returns token successfully (not "Signup failed")
+
+**Step 3: Frontend Integration** ⏳
+- Frontend (Vercel) should now be able to reach backend
+- Signup page should work without errors
+- Ready for E2E testing
+
+### Documentation Created
+
+Added comprehensive guides:
+- `.github/RAILWAY_FRESH_DEPLOYMENT.md` - Complete step-by-step guide
+- `.github/RAILWAY_QUICK_FIX.md` - Troubleshooting for common issues
+
+### Next Steps (Session 2026-05-27 Complete)
+
+1. ⏳ Run E2E tests: `BASE_URL=https://poe-2-assistant-ten.vercel.app npx playwright test`
+2. ✅ API endpoints working
+3. ✅ Database connected
+4. ✅ Authentication functional
+
+---
+
 ## SPA Routing Fix & E2E Testing (2026-05-27)
 
 ### Issue Encountered
